@@ -1,0 +1,148 @@
+""" Rules to build Docker images via `buildkit`.
+
+"""
+
+def buildkit_image(
+    name: str,
+    dockerfile: str,
+    srcs: list = [],
+    repository: str = "",
+    visibility: list = [],
+    tags: list = [],
+    add_latest_tag = True,
+    add_hashed_srcs_tag = True,
+    repository_aliases: list = [],
+):
+    image_repo_prefix = CONFIG.BUILDKIT.IMAGE_REPOSITORY_PREFIX
+    if image_repo_prefix[-1] != "/":
+            image_repo_prefix += "/"
+
+    image_generated_repo_offset = int(CONFIG.BUILDKIT.IMAGE_GENERATED_PKG_OFFSET)
+    buildctl = CONFIG.BUILDKIT.BUILDCTL
+    if not repository:
+        repository = image_repo_prefix + "/".join(package_name().split("/")[image_generated_repo_offset:]) + f"/{name}"
+
+    # build context
+    build_context_rule=tarball(
+        name = f"_{name}#build_context",
+        srcs = [dockerfile] + srcs,
+        visibility = visibility,
+    )
+
+    # repository
+    repository_rule=genrule(
+        name = f"_{name}#repository",
+        outs = [f"_{name}#repository"],
+        cmd = f'echo "{repository}" > $OUTS',
+        visibility = visibility,
+        labels = ["buildkit-repository", "repository"],
+    )
+
+    # tags
+    tag_rule_cmds = []
+    tag_rule_srcs = {}
+    for tag in tags:
+        tag_rule_cmds += [f'echo "{tag}" >> $OUTS']
+
+    if add_latest_tag:
+        tag_rule_cmds += ['echo "latest" >> $OUTS']
+
+    if add_hashed_srcs_tag:
+        tag_rule_srcs["context"] = [build_context_rule]
+        tag_rule_cmds += ['echo "$(sha256sum $SRCS_CONTEXT | cut -f1 -d" ")" >> $OUTS']
+
+    tags_rule=genrule(
+        name = f"_{name}#tags",
+        outs = [f"_{name}#tags"],
+        srcs = tag_rule_srcs,
+        cmd = '\n'.join(tag_rule_cmds),
+        visibility = visibility,
+        labels = ["buildkit-tags", "tags"],
+    )
+
+    # fqn_tag
+    fqn_tags_rule=genrule(
+        name = f"{name}#fqn_tags",
+        srcs = {
+            "repository": [repository_rule],
+            "tags": [tags_rule],
+        },
+        outs = [f"_{name}#fqn_tags"],
+        cmd = """
+            repo=$(cat $SRCS_REPOSITORY)
+            sed "s#^#$repo:#" $SRCS_TAGS > $OUTS
+        """,
+        visibility = visibility,
+    )
+
+    # repository_aliases
+    repository_aliases += [repository]
+    repository_aliases_rule=genrule(
+        name = f"{name}#repository_aliases",
+        outs = [f"{name}#repository_aliases"],
+        cmd = "\n".join([f'echo "{a}" >> $OUTS' for a in repository_aliases]),
+        visibility = visibility,
+    )
+    package_name=package_name().replace("/", "_")
+
+    image_build_rule=genrule(
+        name = f"_{name}#build",
+        srcs = {
+            "srcs": srcs,
+            "dockerfile": [dockerfile],
+            "fqn_tags": [fqn_tags_rule],
+        },
+        outs = {
+            "image": [f"{package_name}_{name}.tar"],
+        },
+        tools = {
+            "buildctl": buildctl,
+        },
+        sandbox = False,
+        cmd = f"""
+            set -Eeuo pipefail
+            tags_csv="$(paste -s -d, $SRCS_FQN_TAGS)"
+            mkdir dockerfile
+            mv $SRCS_DOCKERFILE dockerfile/Dockerfile
+            build() {{
+                $TOOLS_BUILDCTL build \\
+                    --frontend=dockerfile.v0 \\
+                    --local context=. \\
+                    --local dockerfile="dockerfile" \\
+                    --output type=docker,\\"name=$tags_csv\\" > $OUTS_IMAGE
+            }}
+            # try 3 times for good luck!
+            build || build || build
+        """,
+        visibility = visibility,
+    )
+
+    return filegroup(
+        name = name,
+        srcs = [f"{image_build_rule}|image"],
+        visibility = visibility,
+        labels = ["buildkit-image", "image"],
+    )
+
+def buildkit_image_mirror(
+    name: str,
+    repo: str,
+    digest: str,
+    tags: list = [],
+    visibility: list = [],
+    labels: list = [],
+):
+
+    dockerfile=genrule(
+        name = f"_{name}#dockerfile",
+        outs = [f"_{name}#dockerfile"],
+        cmd = f'echo "FROM {repo}@{digest}" > $OUTS',
+    )
+
+    return buildkit_image(
+        name = name,
+        dockerfile = dockerfile,
+        visibility = visibility,
+        repository_aliases = [repo],
+        tags = tags,
+    )
