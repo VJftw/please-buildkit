@@ -1,6 +1,6 @@
-BUILDKIT_VERSION = "0.10.0"
+BUILDKIT_VERSION = "0.10.4"
 
-ROOTLESSKIT_VERSION = "1.0.0"
+ROOTLESSKIT_VERSION = "1.0.1"
 
 remote_file(
     name = "buildkit",

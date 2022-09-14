@@ -3,18 +3,14 @@ set -Exeuo pipefail
 
 reporoot="$(pwd | sed 's#/plz-out/.*##g')"
 mkdir -p "${reporoot}/plz-out/buildkit"
-temp_dir="$(mktemp -d -p "${reporoot}/plz-out/buildkit" tmp.XXXXX)"
+temp_dir="$(mktemp -d -p "${reporoot}/plz-out/buildkit" pb.XXXXX)"
+export XDG_RUNTIME_DIR="$(mktemp -d -p "/run/user/$(id -u)" pb-xdg.XXXXX)"
 function cleanup {
-    chmod -s "${temp_dir}" || true
-    chmod -t "${temp_dir}" || true
-    chmod 700 "${temp_dir}" || true
-    chmod -R 700 "${temp_dir}" || true
     rm -rf "${temp_dir}" || true
+    rm -rf "$XDG_RUNTIME_DIR" || true
 }
 trap cleanup EXIT
 
-export XDG_RUNTIME_DIR="${temp_dir}/xdg"
-mkdir -p "${temp_dir}/xdg"
 mkdir -p "${temp_dir}/rootlesskit"
 mkdir -p "${temp_dir}/buildkitd"
 
@@ -24,6 +20,7 @@ BUILDKIT="$SCRIPT_DIR/third_party/binary/moby/buildkit/bin"
 BUILDCTL_DAEMONLESS="$SCRIPT_DIR/third_party/binary/moby/buildkit/buildctl-daemonless.sh"
 
 export BUILDCTL="$BUILDKIT/buildctl"
-export ROOTLESSKIT="$ROOTLESSKIT --state-dir ${temp_dir}/rootlesskit"
-export BUILDKITD="$BUILDKIT/buildkitd --oci-worker=true --containerd-worker=false --root ${temp_dir}/buildkitd"
+# isolate network from host w/ rootlesskit
+export ROOTLESSKIT="$ROOTLESSKIT --state-dir ${temp_dir}/rootlesskit --net=slirp4netns --copy-up=/etc --disable-host-loopback"
+export BUILDKITD="$BUILDKIT/buildkitd --oci-worker=true --containerd-worker=false --root ${temp_dir}/buildkitd --rootless --oci-worker-rootless --oci-worker-gc --oci-worker-gc-keepstorage 0"
 "$BUILDCTL_DAEMONLESS" "$@"
