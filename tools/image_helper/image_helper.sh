@@ -21,10 +21,10 @@ push() {
     # Support pushing by user-provided repository and tag:
     #   `push index.docker.io/foo/bar:my-tag`
     # Support pushing by user-provided repository, SBOM repository tags:
-    #   `push index.docker.io/foo/bar`
+    #   `push index.docker.io/foo/bar:`
     # Support pushing by SBOM repository, user-provided tag:
     #   `push :my-tag`
-    # Support pushing by user-provided registry, SBOM repository and tags:
+    # Support pushing by user-provided registry, SBOM repository path and tags:
     #   `push localhost:5000`
 
     local img_tar="$1"
@@ -47,9 +47,8 @@ push() {
         mapfile -t sbom_paths < \
             <(printf "%s\n" "${sbom_repo_tags[@]}" | cut -f1 -d: | cut -f2- -d/ | sort -u)
 
-        user_provided_repo_and_tag_regex="^.*:?.*\/.*:.*$"
-        user_provided_repo_regex="^.*:?.*\/[^:]*$"
-        user_provided_registry_regex="^.*:?.*[^:\/]*$"
+        user_provided_repo_and_tag_regex="^.+:?.+\/.+:.+"
+        user_provided_registry_regex="^[^:/]+:?[^:]*$"
 
         for uprt in "${user_provided_repo_tags[@]}"; do
             if [ "${uprt:0:1}" == ":" ]; then
@@ -60,10 +59,10 @@ push() {
             elif [[ "$uprt" =~ $user_provided_repo_and_tag_regex ]]; then
                 # user-provided repo and tag
                 repo_tags_to_push+=("$uprt")
-            elif [[ "$uprt" =~ $user_provided_repo_regex ]]; then
+            elif [[ "${uprt: -1}" == ":" ]]; then
                 # user-provided repo, SBOM tags
                 for sbom_tag in "${sbom_tags[@]}"; do
-                    repo_tags_to_push+=("${uprt}:${sbom_tag}")
+                    repo_tags_to_push+=("${uprt}${sbom_tag}")
                 done
             elif [[ "$uprt" =~ $user_provided_registry_regex ]]; then
                 # user-provided registry, SBOM path and tags
