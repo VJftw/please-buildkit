@@ -112,7 +112,7 @@ def buildkit_image(
                     --output type=docker,\\"name=$tags_csv\\" > $OUTS_IMAGE
             }}
             # try 3 times for good luck!
-            build
+            build || build || build
         """,
         visibility = visibility,
     )

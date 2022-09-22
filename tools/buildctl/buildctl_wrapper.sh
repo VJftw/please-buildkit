@@ -26,6 +26,6 @@ BUILDCTL_DAEMONLESS="$SCRIPT_DIR/third_party/binary/moby/buildkit/buildctl-daemo
 
 export BUILDCTL="$BUILDKIT/buildctl"
 # isolate network from host w/ rootlesskit
-export ROOTLESSKIT="$ROOTLESSKIT --state-dir ${temp_dir}/rootlesskit --net=slirp4netns --copy-up=$temp_dir --disable-host-loopback"
+export ROOTLESSKIT="$ROOTLESSKIT --state-dir ${temp_dir}/rootlesskit --net=slirp4netns --copy-up=/etc --disable-host-loopback"
 export BUILDKITD="$BUILDKIT/buildkitd --oci-worker=true --containerd-worker=false --root ${temp_dir}/buildkitd --rootless --oci-worker-rootless --oci-worker-gc --oci-worker-gc-keepstorage 0"
 "$BUILDCTL_DAEMONLESS" "$@"
