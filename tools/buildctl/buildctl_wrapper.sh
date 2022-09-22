@@ -6,6 +6,11 @@ mkdir -p "${reporoot}/plz-out/buildkit"
 temp_dir="$(mktemp -d -p "${reporoot}/plz-out/buildkit" pb.XXXXX)"
 export XDG_RUNTIME_DIR="$(mktemp -d -p "/run/user/$(id -u)" pb-xdg.XXXXX)"
 function cleanup {
+    chown -R $(id -u):$(id -u) "${temp_dir}" || true
+    chmod -s -R "${temp_dir}" || true
+    chmod -t -R "${temp_dir}" || true
+    chmod 700 "${temp_dir}" || true
+    chmod -R 700 "${temp_dir}" || true
     rm -rf "${temp_dir}" || true
     rm -rf "$XDG_RUNTIME_DIR" || true
 }
@@ -21,6 +26,6 @@ BUILDCTL_DAEMONLESS="$SCRIPT_DIR/third_party/binary/moby/buildkit/buildctl-daemo
 
 export BUILDCTL="$BUILDKIT/buildctl"
 # isolate network from host w/ rootlesskit
-export ROOTLESSKIT="$ROOTLESSKIT --state-dir ${temp_dir}/rootlesskit --net=slirp4netns --copy-up=/etc --disable-host-loopback"
+export ROOTLESSKIT="$ROOTLESSKIT --state-dir ${temp_dir}/rootlesskit --net=slirp4netns --copy-up=$temp_dir --disable-host-loopback"
 export BUILDKITD="$BUILDKIT/buildkitd --oci-worker=true --containerd-worker=false --root ${temp_dir}/buildkitd --rootless --oci-worker-rootless --oci-worker-gc --oci-worker-gc-keepstorage 0"
 "$BUILDCTL_DAEMONLESS" "$@"

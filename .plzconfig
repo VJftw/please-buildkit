@@ -11,6 +11,7 @@ version = 16.21.3
 ; Define the Plugin configuration options.
 [PluginDefinition]
 name = buildkit
+BuildDefsDir = "build/defs"
 
 [PluginConfig "buildctl"]
 DefaultValue = "//tools/buildctl:buildctl"
@@ -22,6 +23,26 @@ Optional = true
 
 [PluginConfig "image_generated_pkg_offset"]
 DefaultValue = 0
+Optional = true
+Inherit = true
+
+[PluginConfig "sbom_tool"]
+DefaultValue = "//third_party/binary/anchore/syft"
+Optional = true
+Inherit = true
+
+[PluginConfig "image_helper_tool"]
+DefaultValue = "//tools/image_helper"
+Optional = true
+Inherit = true
+
+[PluginConfig "crane_tool"]
+DefaultValue = "//third_party/binary/go-containerregistry/crane"
+Optional = true
+Inherit = true
+
+[PluginConfig "jq_tool"]
+DefaultValue = "//third_party/binary/stedolan/jq"
 Optional = true
 Inherit = true
 

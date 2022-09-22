@@ -112,17 +112,49 @@ def buildkit_image(
                     --output type=docker,\\"name=$tags_csv\\" > $OUTS_IMAGE
             }}
             # try 3 times for good luck!
-            build || build || build
+            build
         """,
         visibility = visibility,
     )
 
-    return filegroup(
+    img = filegroup(
         name = name,
         srcs = [f"{image_build_rule}|image"],
         visibility = visibility,
         labels = ["buildkit-image", "image"],
     )
+
+    # Support SBOMs
+    sbom_tool = CONFIG.BUILDKIT.SBOM_TOOL
+    sbom=genrule(
+        name = f"{name}_sbom",
+        srcs = [img],
+        tools = [sbom_tool],
+        outs = [f"{name}_sbom.json"],
+        cmd = f"""
+set -Eeuo pipefail
+$TOOL docker-archive:$SRCS -o json --file $OUTS
+        """
+    )
+
+    image_helper_tool = CONFIG.BUILDKIT.IMAGE_HELPER_TOOL
+    crane_tool = CONFIG.BUILDKIT.CRANE_TOOL
+    jq_tool = CONFIG.BUILDKIT.JQ_TOOL
+    sh_cmd(
+        name = f"{name}_push",
+        data = [img, image_helper_tool, sbom, crane_tool, jq_tool],
+        shell = "/usr/bin/env bash",
+        cmd = f"""
+        set -Eeuo pipefail
+        export JQ="$(out_exe {jq_tool})"
+        export CRANE="$(out_exe {crane_tool})"
+
+        $(out_exe {image_helper_tool}) push "$(out_location {img})" "$(out_location {sbom})" \\\$@
+        """,
+        labels = ["image-push"],
+    )
+
+    return img
 
 def buildkit_image_mirror(
     name: str,
