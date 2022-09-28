@@ -10,8 +10,8 @@ def buildkit_image(
     visibility: list = [],
     tags: list = [],
     add_latest_tag = True,
-    add_hashed_srcs_tag = True,
-    repository_aliases: list = [],
+    add_srcdigest_tag = True,
+    aliases: list = [],
 ):
     image_repo_prefix = CONFIG.BUILDKIT.IMAGE_REPOSITORY_PREFIX
     if image_repo_prefix[-1] != "/":
@@ -47,9 +47,9 @@ def buildkit_image(
     if add_latest_tag:
         tag_rule_cmds += ['echo "latest" >> $OUTS']
 
-    if add_hashed_srcs_tag:
+    if add_srcdigest_tag:
         tag_rule_srcs["context"] = [build_context_rule]
-        tag_rule_cmds += ['echo "$(sha256sum $SRCS_CONTEXT | cut -f1 -d" ")" >> $OUTS']
+        tag_rule_cmds += ['echo "srcdigest-$(sha256sum $SRCS_CONTEXT | cut -f1 -d" ")" >> $OUTS']
 
     tags_rule=genrule(
         name = f"_{name}#tags",
@@ -75,14 +75,6 @@ def buildkit_image(
         visibility = visibility,
     )
 
-    # repository_aliases
-    repository_aliases += [repository]
-    repository_aliases_rule=genrule(
-        name = f"{name}#repository_aliases",
-        outs = [f"{name}#repository_aliases"],
-        cmd = "\n".join([f'echo "{a}" >> $OUTS' for a in repository_aliases]),
-        visibility = visibility,
-    )
     package_name=package_name().replace("/", "_")
 
     image_build_rule=genrule(
@@ -140,19 +132,45 @@ $TOOL docker-archive:$SRCS -o json --file $OUTS
     image_helper_tool = CONFIG.BUILDKIT.IMAGE_HELPER_TOOL
     crane_tool = CONFIG.BUILDKIT.CRANE_TOOL
     jq_tool = CONFIG.BUILDKIT.JQ_TOOL
+
     sh_cmd(
         name = f"{name}_push",
         data = [img, image_helper_tool, sbom, crane_tool, jq_tool],
         shell = "/usr/bin/env bash",
         cmd = f"""
-        set -Eeuo pipefail
-        export JQ="$(out_exe {jq_tool})"
-        export CRANE="$(out_exe {crane_tool})"
+set -Eeuo pipefail
+export JQ="$(out_exe {jq_tool})"
+export CRANE="$(out_exe {crane_tool})"
 
-        $(out_exe {image_helper_tool}) push "$(out_location {img})" "$(out_location {sbom})" \\\$@
+$(out_exe {image_helper_tool}) push \\\\
+    --img_tar="$(out_location {img})" \\\\
+    --sbom_path="$(out_location {sbom})" \\\\
+    --user_provided_repo_tags="\\\$(printf '%s,' "\\\$@")"
         """,
         labels = ["image-push"],
     )
+
+    # aliases
+    aliases += [repository]
+    aliases_csv=",".join(aliases)
+
+    sh_cmd(
+        name = f"{name}_update_refs_in_file",
+        data = [image_helper_tool, sbom, jq_tool],
+        shell = "/usr/bin/env bash",
+        cmd = f"""
+set -Eeuo pipefail
+export JQ="$(out_exe {jq_tool})"
+
+$(out_exe {image_helper_tool}) update_refs_in_file \\\\
+    --aliases="{aliases_csv}" \\\\
+    --sbom_path="$(out_location {sbom})" \\\\
+    --file="\\\$1" \\\\
+    --user_provided_repo_tag="\\\${{2:-}}"
+        """,
+        labels = ["image-update-refs-in-file"],
+    )
+
 
     return img
 
@@ -161,6 +179,7 @@ def buildkit_image_mirror(
     repo: str,
     digest: str,
     tags: list = [],
+    aliases: list = [],
     visibility: list = [],
     labels: list = [],
 ):
@@ -175,6 +194,6 @@ def buildkit_image_mirror(
         name = name,
         dockerfile = dockerfile,
         visibility = visibility,
-        repository_aliases = [repo],
+        aliases = [repo] + aliases,
         tags = tags,
     )
