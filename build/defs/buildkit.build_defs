@@ -155,7 +155,7 @@ $(out_exe {image_helper_tool}) push \\\\
     aliases_csv=",".join(aliases)
 
     sh_cmd(
-        name = f"{name}_update_refs_in_file",
+        name = tag(name, "update_refs_in_file),
         data = [image_helper_tool, sbom, jq_tool],
         shell = "/usr/bin/env bash",
         cmd = f"""
