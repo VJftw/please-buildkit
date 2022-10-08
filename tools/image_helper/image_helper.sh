@@ -57,19 +57,21 @@ update_refs_in_file() {
     sbom_path="$(util::parse_flag sbom_path "$@")"
     IFS=',' read -r -a aliases <<< "$(util::parse_flag aliases "$@")"
     IFS=',' read -r -a user_provided_repo_tags <<< "$(util::parse_flag user_provided_repo_tag "$@")"
+    log::info "Updating image refs in file '$file' for (${aliases[*]})"
 
     repo_tags=($(get_repo_tags "$sbom_path" "${user_provided_repo_tags[@]}"))
     # prioritise srcdigest- tag, otherwise use any other tag.
     repo_tag="${repo_tags[0]}"
-    if printf "%s\n" "${repo_tags[@]}" | grep "srcdigest-"; then
+    if printf "%s\n" "${repo_tags[@]}" | grep "srcdigest-" > /dev/null; then
         repo_tag="$(printf "%s\n" "${repo_tags[@]}" | grep "srcdigest-" | head -n1)"
     fi
 
     # loop through the aliases and replace in file
     for alias in "${aliases[@]}"; do
+        log::info "Replacing '$alias' with '$repo_tag'"
         sed -i "s#${alias}[^\"]*#${repo_tag}#g" "$file"
-        log::success "Replaced '$alias' with '$repo_tag'"
     done
+    log::success "Finished updating image refs in file '$file'"
 }
 
 get_repo_tags() {
