@@ -41,8 +41,8 @@ def buildkit_image(
     # tags
     tag_rule_cmds = []
     tag_rule_srcs = {}
-    for tag in tags:
-        tag_rule_cmds += [f'echo "{tag}" >> $OUTS']
+    for img_tag in tags:
+        tag_rule_cmds += [f'echo "{img_tag}" >> $OUTS']
 
     if add_latest_tag:
         tag_rule_cmds += ['echo "latest" >> $OUTS']
