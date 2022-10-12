@@ -227,13 +227,17 @@ def buildkit_scratch_image(
         outs = [f"_{name}#dockerfile"],
         cmd = f"""
 echo "FROM scratch" >> $OUTS
+entrypoint="{cmd_entrypoint}"
 for src in $SRCS; do
     echo "COPY $src /$src" >> $OUTS
+    if [ "$entrypoint" = "[]" ] && [ -x "$src" ]; then
+        entrypoint="[\\\"/${{src}}\\\"]"
+    fi
 done
 
 {tls_cas_step}
 
-echo 'ENTRYPOINT {cmd_entrypoint}' >> $OUTS
+echo "ENTRYPOINT $entrypoint" >> $OUTS
 echo 'CMD {cmd_json}' >> $OUTS
 echo "USER {user}" >> $OUTS
         """,

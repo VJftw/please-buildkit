@@ -18,3 +18,8 @@ buildkit_scratch_image(
     entrypoint = ["/test/scratch1/main"],
     include_tls_cas = True,
 )
+
+buildkit_scratch_image(
+    name = "image_auto_entrypoint",
+    srcs = [":main", "data.txt"],
+)
