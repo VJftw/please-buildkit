@@ -8,7 +8,7 @@ BUILD_ARCH = BUILD_ARCHES[CONFIG.ARCH]
 
 remote_file(
     name = "jq",
+    binary = True,
     url = f"https://github.com/stedolan/jq/releases/download/jq-{VERSION}/jq-{CONFIG.OS}{BUILD_ARCH}",
     visibility = ["PUBLIC"],
-    binary = True,
 )

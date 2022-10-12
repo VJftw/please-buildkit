@@ -197,3 +197,55 @@ def buildkit_image_mirror(
         aliases = [repo] + aliases,
         tags = tags,
     )
+
+def buildkit_scratch_image(
+    name: str,
+    srcs: list = [],
+    entrypoint: list = [],
+    cmd: list = [],
+    user: str = "65535",
+    visibility: list = [],
+    tags: list = [],
+    add_latest_tag = True,
+    add_srcdigest_tag = True,
+    aliases: list = [],
+    include_tls_cas: bool = False,
+):
+    cmd_entrypoint=json(entrypoint)
+    cmd_json=json(cmd)
+
+    tls_cas_step=""
+    if include_tls_cas:
+        tls_cas=CONFIG.BUILDKIT.SCRATCH_TLS_CAS
+        tls_cas_scratch_path=CONFIG.BUILDKIT.SCRATCH_TLS_CAS_PATH
+        tls_cas_step=f"echo 'COPY $(location {tls_cas}) {tls_cas_scratch_path}' >> $OUTS"
+        srcs += [tls_cas]
+
+    dockerfile=genrule(
+        name = tag(name, "dockerfile"),
+        srcs = srcs,
+        outs = [f"_{name}#dockerfile"],
+        cmd = f"""
+echo "FROM scratch" >> $OUTS
+for src in $SRCS; do
+    echo "COPY $src /$src" >> $OUTS
+done
+
+{tls_cas_step}
+
+echo 'ENTRYPOINT {cmd_entrypoint}' >> $OUTS
+echo 'CMD {cmd_json}' >> $OUTS
+echo "USER {user}" >> $OUTS
+        """,
+    )
+
+    return buildkit_image(
+        name = name,
+        dockerfile = dockerfile,
+        srcs = srcs,
+        visibility = visibility,
+        aliases = aliases,
+        tags = tags,
+        add_latest_tag = add_latest_tag,
+        add_srcdigest_tag = add_srcdigest_tag,
+    )

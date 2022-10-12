@@ -7,6 +7,12 @@
 ; when you change it all users will automatically get updated.
 [please]
 version = 16.21.3
+; Support the non *-rules repo name format of Please plugins.
+PluginRepo = "https://github.com/{owner}/{plugin}/archive/{revision}.zip"
+
+
+[featureflags]
+ExcludeGoRules = true
 
 ; Define the Plugin configuration options.
 [PluginDefinition]
@@ -46,6 +52,24 @@ DefaultValue = "//third_party/binary/stedolan/jq"
 Optional = true
 Inherit = true
 
+[PluginConfig "scratch_tls_cas"]
+DefaultValue = "//third_party/tls:mozilla_cas"
+Help = "A Please target which outputs the file of PEM encoded CA certificates to trust."
+Optional = true
+Inherit = true
+
+[PluginConfig "scratch_tls_cas_path"]
+DefaultValue = "/etc/ssl/certs/ca-certificates.crt"
+Help = "The path in the scratch image to write the TLS CA file to."
+Optional = true
+Inherit = true
+
 ; Use the plugin in this repository for tests.
 [Plugin "buildkit"]
 ImageRepositoryPrefix = "ghcr.io/vjftw/please-buildkit"
+
+; Go Plugin is used to build helpers.
+[Plugin "go"]
+Target = //third_party/plugins:go
+ImportPath = github.com/VJftw/please-buildkit
+gotool = //third_party/go:toolchain|go
