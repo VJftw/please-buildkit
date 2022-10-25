@@ -198,7 +198,7 @@ def buildkit_image_mirror(
         tags = tags,
     )
 
-def buildkit_scratch_image(
+def buildkit_distroless_image(
     name: str,
     srcs: list = [],
     entrypoint: list = [],
@@ -209,39 +209,24 @@ def buildkit_scratch_image(
     add_latest_tag = True,
     add_srcdigest_tag = True,
     aliases: list = [],
-    include_tls_cas: bool = False,
-    include_nsswitch: bool = False,
 ):
     cmd_entrypoint=json(entrypoint)
     cmd_json=json(cmd)
 
-    tls_cas_step=""
-    if include_tls_cas:
-        tls_cas=CONFIG.BUILDKIT.SCRATCH_TLS_CAS
-        tls_cas_scratch_path=CONFIG.BUILDKIT.SCRATCH_TLS_CAS_PATH
-        tls_cas_step=f"echo 'COPY $(location {tls_cas}) {tls_cas_scratch_path}' >> $OUTS"
-        srcs += [tls_cas]
-
-    nsswitch_step=""
-    if include_nsswitch:
-        nsswitch=CONFIG.BUILDKIT.SCRATCH_NSSWITCH
-        nsswitch_step=f"echo 'COPY $(location {nsswitch}) /etc/nsswitch.conf' >> $OUTS"
-        srcs += [nsswitch]
+    distroless_default_base = CONFIG.BUILDKIT.DISTROLESS_DEFAULT_BASE
 
     dockerfile=genrule(
         name = tag(name, "dockerfile"),
         srcs = srcs,
         outs = [f"_{name}#dockerfile"],
         cmd = f"""
-echo "FROM scratch" >> $OUTS
-{tls_cas_step}
-{nsswitch_step}
+echo "FROM {distroless_default_base}" >> $OUTS
 
 entrypoint="{cmd_entrypoint}"
 for src in $SRCS; do
-    echo "COPY $src /$src" >> $OUTS
+    echo "COPY $src /app/$src" >> $OUTS
     if [ "$entrypoint" = "[]" ] && [ -x "$src" ]; then
-        entrypoint="[\\\"/${{src}}\\\"]"
+        entrypoint="[\\\"/app/${{src}}\\\"]"
     fi
 done
 
