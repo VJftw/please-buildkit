@@ -210,6 +210,7 @@ def buildkit_scratch_image(
     add_srcdigest_tag = True,
     aliases: list = [],
     include_tls_cas: bool = False,
+    include_nsswitch: bool = False,
 ):
     cmd_entrypoint=json(entrypoint)
     cmd_json=json(cmd)
@@ -221,12 +222,21 @@ def buildkit_scratch_image(
         tls_cas_step=f"echo 'COPY $(location {tls_cas}) {tls_cas_scratch_path}' >> $OUTS"
         srcs += [tls_cas]
 
+    nsswitch_step=""
+    if include_nsswitch:
+        nsswitch=CONFIG.BUILDKIT.SCRATCH_NSSWITCH
+        nsswitch_step=f"echo 'COPY $(location {nsswitch}) /etc/nsswitch.conf' >> $OUTS"
+        srcs += [nsswitch]
+
     dockerfile=genrule(
         name = tag(name, "dockerfile"),
         srcs = srcs,
         outs = [f"_{name}#dockerfile"],
         cmd = f"""
 echo "FROM scratch" >> $OUTS
+{tls_cas_step}
+{nsswitch_step}
+
 entrypoint="{cmd_entrypoint}"
 for src in $SRCS; do
     echo "COPY $src /$src" >> $OUTS
@@ -234,8 +244,6 @@ for src in $SRCS; do
         entrypoint="[\\\"/${{src}}\\\"]"
     fi
 done
-
-{tls_cas_step}
 
 echo "ENTRYPOINT $entrypoint" >> $OUTS
 echo 'CMD {cmd_json}' >> $OUTS

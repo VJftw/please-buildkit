@@ -64,6 +64,12 @@ Help = "The path in the scratch image to write the TLS CA file to."
 Optional = true
 Inherit = true
 
+[PluginConfig "scratch_nsswitch"]
+DefaultValue = "//assets:minimal_nsswitch"
+Help = "A Please target which outputs the file to add as '/etc/nsswitch.conf'."
+Optional = true
+Inherit = true
+
 ; Use the plugin in this repository for tests.
 [Plugin "buildkit"]
 ImageRepositoryPrefix = "ghcr.io/vjftw/please-buildkit"
