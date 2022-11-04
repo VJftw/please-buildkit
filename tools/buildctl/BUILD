@@ -3,8 +3,8 @@ sh_cmd(
     cmd = """
 set -Exeuo pipefail
 reporoot="\\\\$(pwd | sed 's#/plz-out/.*##g')"
-mkdir -p "\\\\${reporoot}/plz-out/buildkit"
-temp_dir="\\\\$(mktemp -d -p "\\\\${reporoot}/plz-out/buildkit" tmp.XXXXX)"
+mkdir -p "/tmp/please/buildkit"
+temp_dir="\\\\$(mktemp -d -p "/tmp/please/buildkit" tmp.XXXXX)"
 cleanup() {
     chmod -s "\\\\${temp_dir}" || true
     chmod -t "\\\\${temp_dir}" || true
