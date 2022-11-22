@@ -126,7 +126,8 @@ def buildkit_image(
         cmd = f"""
 set -Eeuo pipefail
 $TOOL docker-archive:$SRCS -o json --file $OUTS
-        """
+        """,
+        visibility = visibility,
     )
 
     image_helper_tool = CONFIG.BUILDKIT.IMAGE_HELPER_TOOL
@@ -148,6 +149,7 @@ $(out_exe {image_helper_tool}) push \\\\
     --user_provided_repo_tags="\\\$(printf '%s,' "\\\$@")"
         """,
         labels = ["image-push"],
+        visibility = visibility,
     )
 
     # aliases
@@ -169,6 +171,7 @@ $(out_exe {image_helper_tool}) update_refs_in_file \\\\
     --user_provided_repo_tag="\\\${{2:-}}"
         """,
         labels = ["image-update-refs-in-file"],
+        visibility = visibility,
     )
 
 
