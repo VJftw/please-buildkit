@@ -103,7 +103,7 @@ func (p *DockerProvider) Start(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("could not run '%s': %w", strings.Join(logsCmd.Args, " "), err)
 	}
 
-	if err := WaitForGRPC(p.opts.Address, 5*time.Second); err != nil {
+	if err := WaitForGRPC(p.opts.Address, 30*time.Second); err != nil {
 		return "", err
 	}
 
