@@ -6,10 +6,12 @@
 ; Or you can uncomment the following to pin everyone to a particular version;
 ; when you change it all users will automatically get updated.
 [please]
-version = 16.21.3
+version = 16.24.0
 ; Support the non *-rules repo name format of Please plugins.
 PluginRepo = "https://github.com/{owner}/{plugin}/archive/{revision}.zip"
 
+[Parse]
+PreloadSubincludes = "///go//build_defs:go"
 
 [featureflags]
 ExcludeGoRules = true
@@ -19,13 +21,33 @@ ExcludeGoRules = true
 name = buildkit
 BuildDefsDir = "build/defs"
 
-[PluginConfig "buildctl"]
-DefaultValue = "//tools/buildctl:buildctl"
+[PluginConfig "tool"]
+ConfigKey = Tool
+DefaultValue = "//third_party/binary:please_buildkit"
 Inherit = true
+Help = "Sets the given Please target as the Tool which the Buildkit build_defs use to build Buildkit configuration. Leaving this as the default and setting ToolVersion will utilise pre-built binaries from GitHub Releases."
+
+[PluginConfig "tool_version"]
+ConfigKey = ToolVersion
+Optional = true
+Inherit = true
+Help = "In conjunction with the default value for Tool, this sets the version of the Tool which should be downloaded from GitHub Releases."
+
+[PluginConfig "worker_tool"]
+ConfigKey = WorkerTool
+DefaultValue = "//third_party/binary:please_buildkit_worker"
+Inherit = true
+Help = "Sets the given Please target as the Please Worker Tool."
+
+[PluginConfig "buildctl_tool"]
+DefaultValue = "//third_party/binary/moby/buildkit:buildkit|buildctl"
+Inherit = true
+Help = "Sets the given Please target as the 'buildctl' binary."
 
 [PluginConfig "image_repository_prefix"]
 DefaultValue = ""
 Optional = true
+Help = "Sets the image repository prefix for the generated repository when tagging images."
 
 [PluginConfig "image_generated_pkg_offset"]
 DefaultValue = 0
@@ -36,31 +58,25 @@ Inherit = true
 DefaultValue = "//third_party/binary/anchore/syft"
 Optional = true
 Inherit = true
-
-[PluginConfig "image_helper_tool"]
-DefaultValue = "//tools/image_helper"
-Optional = true
-Inherit = true
+Help = "Sets the given Please target to use for generating SBOMs of built images."
 
 [PluginConfig "crane_tool"]
 DefaultValue = "//third_party/binary/go-containerregistry/crane"
 Optional = true
 Inherit = true
-
-[PluginConfig "jq_tool"]
-DefaultValue = "//third_party/binary/stedolan/jq"
-Optional = true
-Inherit = true
+Help = "Sets the given Please target to use for pushing images."
 
 [PluginConfig "distroless_default_base"]
 DefaultValue = "gcr.io/distroless/static-debian11:latest"
-Help = "A docker image to use as the base for all distroless images. See https://github.com/GoogleContainerTools/distroless."
+Help = "A docker image to use as the default base for all distroless images. See https://github.com/GoogleContainerTools/distroless."
 Optional = true
 Inherit = true
 
 ; Use the plugin in this repository for tests.
 [Plugin "buildkit"]
 ImageRepositoryPrefix = "ghcr.io/vjftw/please-buildkit"
+Tool = "//cmd/please_buildkit"
+WorkerTool = "//cmd/please_buildkit:please_buildkit_worker"
 
 ; Go Plugin is used to build helpers.
 [Plugin "go"]
