@@ -20,5 +20,8 @@ buildkit_distroless_image(
 
 buildkit_distroless_image(
     name = "image_auto_entrypoint",
-    srcs = [":main", "data.txt"],
+    srcs = [
+        "data.txt",
+        ":main",
+    ],
 )

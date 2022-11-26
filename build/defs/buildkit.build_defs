@@ -10,7 +10,7 @@ def buildkit_image(
     visibility: list = [],
     tags: list = [],
     add_latest_tag = True,
-    add_srcdigest_tag = True,
+    add_src_tag = True,
     aliases: list = [],
 ):
     image_repo_prefix = CONFIG.BUILDKIT.IMAGE_REPOSITORY_PREFIX
@@ -18,7 +18,6 @@ def buildkit_image(
             image_repo_prefix += "/"
 
     image_generated_repo_offset = int(CONFIG.BUILDKIT.IMAGE_GENERATED_PKG_OFFSET)
-    buildctl = CONFIG.BUILDKIT.BUILDCTL
     if not repository:
         repository = image_repo_prefix + "/".join(package_name().split("/")[image_generated_repo_offset:]) + f"/{name}"
 
@@ -39,25 +38,13 @@ def buildkit_image(
     )
 
     # tags
-    tag_rule_cmds = []
-    tag_rule_srcs = {}
-    for img_tag in tags:
-        tag_rule_cmds += [f'echo "{img_tag}" >> $OUTS']
-
-    if add_latest_tag:
-        tag_rule_cmds += ['echo "latest" >> $OUTS']
-
-    if add_srcdigest_tag:
-        tag_rule_srcs["context"] = [build_context_rule]
-        tag_rule_cmds += ['echo "srcdigest-$(sha256sum $SRCS_CONTEXT | cut -f1 -d" ")" >> $OUTS']
-
-    tags_rule=genrule(
-        name = f"_{name}#tags",
-        outs = [f"_{name}#tags"],
-        srcs = tag_rule_srcs,
-        cmd = '\n'.join(tag_rule_cmds),
-        visibility = visibility,
-        labels = ["buildkit-tags", "tags"],
+    tags_rule=_image_tags_rule(
+        name,
+        build_context_rule,
+        tags,
+        add_latest_tag,
+        add_src_tag,
+        visibility,
     )
 
     # fqn_tag
@@ -69,14 +56,16 @@ def buildkit_image(
         },
         outs = [f"_{name}#fqn_tags"],
         cmd = """
-            repo=$(cat $SRCS_REPOSITORY)
-            sed "s#^#$repo:#" $SRCS_TAGS > $OUTS
+repo=$(cat $SRCS_REPOSITORY)
+sed "s#^#$repo:#" $SRCS_TAGS > $OUTS
         """,
         visibility = visibility,
     )
 
     package_name=package_name().replace("/", "_")
 
+    please_buildkit_tool = CONFIG.BUILDKIT.TOOL
+    please_buildkit_worker = CONFIG.BUILDKIT.WORKER_TOOL
     image_build_rule=genrule(
         name = f"_{name}#build",
         srcs = {
@@ -87,24 +76,12 @@ def buildkit_image(
         outs = {
             "image": [f"{package_name}_{name}.tar"],
         },
-        tools = {
-            "buildctl": buildctl,
-        },
         sandbox = False,
-        cmd = f"""
-            set -Eeuo pipefail
-            tags_csv="$(paste -s -d, $SRCS_FQN_TAGS)"
-            mkdir dockerfile
-            mv $SRCS_DOCKERFILE dockerfile/Dockerfile
-            build() {{
-                $TOOLS_BUILDCTL build \\
-                    --frontend=dockerfile.v0 \\
-                    --local context=. \\
-                    --local dockerfile="dockerfile" \\
-                    --output type=docker,\\"name=$tags_csv\\" > $OUTS_IMAGE
-            }}
-            # try 3 times for good luck!
-            build || build || build
+        tools = [please_buildkit_worker],
+        cmd = f"""$(worker {please_buildkit_worker}) \\
+            --image_out="{package_name}_{name}.tar" \\
+            --fqn_tags_file="$(location {fqn_tags_rule})" \\
+            --dockerfile="$(location {dockerfile})"
         """,
         visibility = visibility,
     )
@@ -130,23 +107,19 @@ $TOOL docker-archive:$SRCS -o json --file $OUTS
         visibility = visibility,
     )
 
-    image_helper_tool = CONFIG.BUILDKIT.IMAGE_HELPER_TOOL
     crane_tool = CONFIG.BUILDKIT.CRANE_TOOL
-    jq_tool = CONFIG.BUILDKIT.JQ_TOOL
-
     sh_cmd(
         name = f"{name}_push",
-        data = [img, image_helper_tool, sbom, crane_tool, jq_tool],
+        data = [img, please_buildkit_tool, fqn_tags_rule, crane_tool],
         shell = "/usr/bin/env bash",
         cmd = f"""
 set -Eeuo pipefail
-export JQ="$(out_exe {jq_tool})"
-export CRANE="$(out_exe {crane_tool})"
-
-$(out_exe {image_helper_tool}) push \\\\
-    --img_tar="$(out_location {img})" \\\\
-    --sbom_path="$(out_location {sbom})" \\\\
-    --user_provided_repo_tags="\\\$(printf '%s,' "\\\$@")"
+reporoot="\\\\$(./pleasew query reporoot)"
+"\\\$reporoot/$(out_exe {please_buildkit_tool})" push \\\\
+    --crane_tool="\\\$reporoot/$(out_exe {crane_tool})" \\\\
+    --img_tar_path="\\\$reporoot/$(out_location {img})" \\\\
+    --fqn_tags_path="\\\$reporoot/$(out_location {fqn_tags_rule})" \\\\
+    "\\\$@"
         """,
         labels = ["image-push"],
         visibility = visibility,
@@ -154,26 +127,24 @@ $(out_exe {image_helper_tool}) push \\\\
 
     # aliases
     aliases += [repository]
-    aliases_csv=",".join(aliases)
+    aliases_flags=[f"--aliases={a}" for a in aliases]
 
     sh_cmd(
-        name = tag(name, "update_refs_in_file"),
-        data = [image_helper_tool, sbom, jq_tool],
+        name = tag(name, "replace"),
+        data = [please_buildkit_tool, fqn_tags_rule],
         shell = "/usr/bin/env bash",
         cmd = f"""
 set -Eeuo pipefail
-export JQ="$(out_exe {jq_tool})"
-
-$(out_exe {image_helper_tool}) update_refs_in_file \\\\
-    --aliases="{aliases_csv}" \\\\
-    --sbom_path="$(out_location {sbom})" \\\\
-    --file="\\\$1" \\\\
-    --user_provided_repo_tag="\\\${{2:-}}"
+reporoot="\\\\$(./pleasew query reporoot)"
+"\\\$reporoot/$(out_exe {please_buildkit_tool})" replace \\\\
+    {aliases_flags} \\\\
+    --fqn_tags_path="\\\$reporoot/$(out_location {fqn_tags_rule})" \\\\
+    --file_path="\\\$1" \\\\
+    \\\${{2:-}}
         """,
-        labels = ["image-update-refs-in-file"],
+        labels = ["image-replace"],
         visibility = visibility,
     )
-
 
     return img
 
@@ -210,7 +181,7 @@ def buildkit_distroless_image(
     visibility: list = [],
     tags: list = [],
     add_latest_tag = True,
-    add_srcdigest_tag = True,
+    add_src_tag = True,
     aliases: list = [],
 ):
     cmd_entrypoint=json(entrypoint)
@@ -247,5 +218,72 @@ echo "USER {user}" >> $OUTS
         aliases = aliases,
         tags = tags,
         add_latest_tag = add_latest_tag,
-        add_srcdigest_tag = add_srcdigest_tag,
+        add_src_tag = add_src_tag,
     )
+
+def _image_tags_rule(
+    name: str,
+    build_context_rule: str,
+    tags: list,
+    add_latest_tag: bool,
+    add_src_tag: bool,
+    visibility: list,
+):
+    tag_rule_cmds = []
+    tag_rule_srcs = {}
+    for img_tag in tags:
+        tag_rule_cmds += [f'echo "{img_tag}" >> $OUTS']
+
+    if add_latest_tag:
+        tag_rule_cmds += ['echo "latest" >> $OUTS']
+
+    if add_src_tag:
+        tag_rule_srcs["context"] = [build_context_rule]
+        tag_rule_cmds += ['echo "srcsha256-$(sha256sum $SRCS_CONTEXT | cut -f1 -d" ")" >> $OUTS']
+
+    return genrule(
+        name = f"_{name}#tags",
+        outs = [f"_{name}#tags"],
+        srcs = tag_rule_srcs,
+        cmd = '\n'.join(tag_rule_cmds),
+        visibility = visibility,
+        labels = ["buildkit-tags", "tags"],
+    )
+
+def _buildkit_tool():
+    default_buildkit_tools = [
+        "///buildkit//third_party/binary:please_buildkit",
+        "//third_party/binary:please_buildkit",
+    ]
+    if CONFIG.BUILDKIT.TOOL not in default_buildkit_tools and CONFIG.BUILDKIT.TOOL_VERSION:
+        fail(f"buildkit.ToolVersion should only be set when buildkit.Tool is the default value (currently: '{CONFIG.TERRAFORM.TOOL}').")
+
+    buildkit_tool_rule=""
+    if CONFIG.BUILDKIT.TOOL_VERSION:
+        buildkit_tool_rule=remote_file(
+            name = "please_buildkit",
+            url = f"https://github.com/VJftw/please-buildkit/releases/download/{CONFIG.BUILDKIT.TOOL_VERSION}/please_buildkit",
+            visibility = ["PUBLIC"],
+            binary = True,
+        )
+
+    if CONFIG.BUILDKIT.TOOL:
+        buildkit_tool_rule=CONFIG.BUILDKIT.TOOL
+
+    buildctl_tool=CONFIG.BUILDKIT.BUILDCTL_TOOL
+    sh_cmd(
+        name = "please_buildkit_worker",
+        data = [
+            buildkit_tool_rule,
+            buildctl_tool,
+        ],
+        shell = "/usr/bin/env bash",
+        cmd = f"""
+reporoot="\\\\$(pwd | sed 's#/plz-out/.*##g')"
+"\\\\$reporoot/$(out_exe {buildkit_tool_rule})" \\
+    worker \\
+    --buildctl_binary="\\\\$reporoot/$(out_exe {buildctl_tool})" \\
+    "\\\\$@"
+        """,
+        visibility = ["PUBLIC"],
+        )
