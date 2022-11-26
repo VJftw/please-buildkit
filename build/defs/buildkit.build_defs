@@ -114,11 +114,10 @@ $TOOL docker-archive:$SRCS -o json --file $OUTS
         shell = "/usr/bin/env bash",
         cmd = f"""
 set -Eeuo pipefail
-reporoot="\\\\$(./pleasew query reporoot)"
-"\\\$reporoot/$(out_exe {please_buildkit_tool})" push \\\\
-    --crane_tool="\\\$reporoot/$(out_exe {crane_tool})" \\\\
-    --img_tar_path="\\\$reporoot/$(out_location {img})" \\\\
-    --fqn_tags_path="\\\$reporoot/$(out_location {fqn_tags_rule})" \\\\
+"$(out_exe {please_buildkit_tool})" push \\\\
+    --crane_tool="$(out_exe {crane_tool})" \\\\
+    --img_tar_path="$(out_location {img})" \\\\
+    --fqn_tags_path="$(out_location {fqn_tags_rule})" \\\\
     "\\\$@"
         """,
         labels = ["image-push"],
@@ -135,10 +134,9 @@ reporoot="\\\\$(./pleasew query reporoot)"
         shell = "/usr/bin/env bash",
         cmd = f"""
 set -Eeuo pipefail
-reporoot="\\\\$(./pleasew query reporoot)"
-"\\\$reporoot/$(out_exe {please_buildkit_tool})" replace \\\\
+"$(out_exe {please_buildkit_tool})" replace \\\\
     {aliases_flags} \\\\
-    --fqn_tags_path="\\\$reporoot/$(out_location {fqn_tags_rule})" \\\\
+    --fqn_tags_path="$(out_location {fqn_tags_rule})" \\\\
     --file_path="\\\$1" \\\\
     \\\${{2:-}}
         """,
