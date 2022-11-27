@@ -1,3 +1,5 @@
+subinclude("///go//build_defs:go")
+
 go_module(
     name = "go-flags",
     licences = ["BSD-3-Clause"],
