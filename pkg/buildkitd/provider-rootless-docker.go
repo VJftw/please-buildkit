@@ -6,43 +6,42 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-// DockerProviderOpts represents the options for the buildkitd docker provider.
-type DockerProviderOpts struct {
+// RootlessDockerProviderOpts represents the options for the buildkitd docker provider.
+type RootlessDockerProviderOpts struct {
 	Binary  string
 	Name    string
 	Image   string
 	Address string
 }
 
-// DockerProvider implements the buildkit provider via Docker.
-type DockerProvider struct {
+// RootlessDockerProvider implements the buildkit provider via Docker.
+type RootlessDockerProvider struct {
 	Provider
-	opts *DockerProviderOpts
+	opts *RootlessDockerProviderOpts
 }
 
-// NewDockerProvider returns a new buildkit provider implemented via Docker.
-func NewDockerProvider(o *DockerProviderOpts) *DockerProvider {
-	return &DockerProvider{
+// NewRootlessDockerProvider returns a new buildkit provider implemented via Docker.
+func NewRootlessDockerProvider(o *RootlessDockerProviderOpts) *RootlessDockerProvider {
+	return &RootlessDockerProvider{
 		opts: o,
 	}
 }
 
 // IsSupported implements Provider.IsSupported.
-func (p *DockerProvider) IsSupported(ctx context.Context) bool {
+func (p *RootlessDockerProvider) IsSupported(ctx context.Context) bool {
 	if _, err := exec.LookPath(p.opts.Binary); err != nil {
-		return true
+		return false
 	}
 
 	return true
 }
 
 // Start implements Provider.Start.
-func (p *DockerProvider) Start(ctx context.Context) (string, error) {
+func (p *RootlessDockerProvider) Start(ctx context.Context) (string, error) {
 	existsCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"ps",
 		"--filter", fmt.Sprintf("name=%s", p.opts.Name),
@@ -68,19 +67,22 @@ func (p *DockerProvider) Start(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("could not run '%s': %w", strings.Join(pullCmd.Args, " "), err)
 	}
 
-	log.Info().Msgf("starting '%s' container", p.opts.Name)
 	portNumber := strings.Split(p.opts.Address, ":")[1]
 	runCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"run",
 		"--rm",
 		"-d",
+		"--security-opt", "seccomp=unconfined",
+		"--security-opt", "apparmor=unconfined",
+		"--security-opt", "systempaths=unconfined",
 		"--name", p.opts.Name,
-		"--privileged",
 		"--publish", fmt.Sprintf("%s:%s", portNumber, portNumber),
 		p.opts.Image,
 		"--addr",
 		fmt.Sprintf("tcp://%s", p.opts.Address),
+		"--oci-worker-no-process-sandbox",
 	}...)
+	log.Info().Str("cmd", strings.Join(runCmd.Args, " ")).Msgf("starting '%s' container", p.opts.Name)
 	if err := runCmd.Run(); err != nil {
 		return "", fmt.Errorf("could not run '%s': %w", strings.Join(runCmd.Args, " "), err)
 	}
@@ -103,15 +105,11 @@ func (p *DockerProvider) Start(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("could not run '%s': %w", strings.Join(logsCmd.Args, " "), err)
 	}
 
-	if err := WaitForGRPC(p.opts.Address, 30*time.Second); err != nil {
-		return "", err
-	}
-
 	return fmt.Sprintf("tcp://%s", p.opts.Address), nil
 }
 
 // Stop implements Provider.Stop.
-func (p *DockerProvider) Stop(ctx context.Context) error {
+func (p *RootlessDockerProvider) Stop(ctx context.Context) error {
 	log.Info().Msgf("stopping '%s' container", p.opts.Name)
 	stopCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"stop",

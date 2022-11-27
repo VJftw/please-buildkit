@@ -28,16 +28,28 @@ workers as errors. Logs from this command are written to 'plz-out/log/'.
 				Value: "buildctl",
 			},
 			&cli.StringFlag{
-				Name:  "docker_binary",
+				Name:  "root_docker_binary",
 				Value: "docker",
 			},
 			&cli.StringFlag{
-				Name:  "docker_name",
+				Name:  "root_docker_name",
 				Value: "please-buildkitd",
 			},
 			&cli.StringFlag{
-				Name:  "docker_image",
+				Name:  "root_docker_image",
 				Value: "moby/buildkit:master",
+			},
+			&cli.StringFlag{
+				Name:  "rootless_docker_binary",
+				Value: "docker",
+			},
+			&cli.StringFlag{
+				Name:  "rootless_docker_name",
+				Value: "please-buildkitd",
+			},
+			&cli.StringFlag{
+				Name:  "rootless_docker_image",
+				Value: "moby/buildkit:master-rootless",
 			},
 			&cli.StringFlag{
 				Name:  "podman_binary",
@@ -73,16 +85,22 @@ workers as errors. Logs from this command are written to 'plz-out/log/'.
 			log.Logger = zerolog.New(multi).With().Timestamp().Logger()
 
 			chainProvider := buildkitd.NewChainProvider(
-				buildkitd.NewDockerProvider(&buildkitd.DockerProviderOpts{
-					Binary:  cCtx.String("docker_binary"),
-					Name:    cCtx.String("docker_name"),
-					Image:   cCtx.String("docker_image"),
-					Address: cCtx.String("buildkitd_address"),
-				}),
 				buildkitd.NewPodmanProvider(&buildkitd.PodmanProviderOpts{
 					Binary:  cCtx.String("podman_binary"),
 					Name:    cCtx.String("podman_name"),
 					Image:   cCtx.String("podman_image"),
+					Address: cCtx.String("buildkitd_address"),
+				}),
+				buildkitd.NewRootlessDockerProvider(&buildkitd.RootlessDockerProviderOpts{
+					Binary:  cCtx.String("rootless_docker_binary"),
+					Name:    cCtx.String("rootless_docker_name"),
+					Image:   cCtx.String("rootless_docker_image"),
+					Address: cCtx.String("buildkitd_address"),
+				}),
+				buildkitd.NewRootDockerProvider(&buildkitd.RootDockerProviderOpts{
+					Binary:  cCtx.String("root_docker_binary"),
+					Name:    cCtx.String("root_docker_name"),
+					Image:   cCtx.String("root_docker_image"),
 					Address: cCtx.String("buildkitd_address"),
 				}),
 			)

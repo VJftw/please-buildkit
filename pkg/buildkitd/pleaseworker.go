@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -29,6 +30,15 @@ func NewPleaseWorker(o *PleaseWorkerOpts) *PleaseWorker {
 }
 
 func (w *PleaseWorker) Start(ctx context.Context) error {
+
+	if err := WaitForBuildKitWorkers(
+		w.opts.BuildCtlBinary,
+		w.opts.BuildKitAddress,
+		30*time.Second,
+	); err != nil {
+		return err
+	}
+
 	decodedMsg := make(chan *Request, 1)
 	decoder := json.NewDecoder(os.Stdin)
 	go func() {

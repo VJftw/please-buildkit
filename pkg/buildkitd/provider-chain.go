@@ -1,6 +1,11 @@
 package buildkitd
 
-import "context"
+import (
+	"context"
+	"fmt"
+
+	"github.com/rs/zerolog/log"
+)
 
 // ChainProvider returns a chain implementation of Provider.
 type ChainProvider struct {
@@ -20,6 +25,7 @@ func (p *ChainProvider) IsSupported(ctx context.Context) bool {
 	for _, provider := range p.providers {
 		if provider.IsSupported(ctx) {
 			p.provider = provider
+			log.Info().Str("provide", fmt.Sprintf("%T", provider)).Msg("using provider")
 			return true
 		}
 	}

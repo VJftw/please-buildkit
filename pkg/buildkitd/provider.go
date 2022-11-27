@@ -2,12 +2,11 @@ package buildkitd
 
 import (
 	"context"
-	"net"
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Provider abstracts the implementations of BuildKitD providers that run
@@ -24,44 +23,33 @@ type Provider interface {
 	Stop(ctx context.Context) error
 }
 
-func WaitForIt(addr string, timeout time.Duration) error {
+func WaitForBuildKitWorkers(
+	buildctlBinary string,
+	addr string,
+	timeout time.Duration,
+) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	_ = cancel
-	log.Info().Msgf("waiting for %s", addr)
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(250 * time.Millisecond):
-			if _, err := net.Dial("tcp", addr); err != nil {
-				continue
-			}
-			log.Info().Msgf("%s is available", addr)
-			return nil
-		}
-	}
-}
-
-func WaitForGRPC(addr string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	_ = cancel
-	log.Info().Msgf("waiting for %s", addr)
+	log.Info().Msgf("waiting for buildkit workers %s", addr)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(250 * time.Millisecond):
-			if _, err := net.Dial("tcp", addr); err != nil {
+			cmd := exec.CommandContext(ctx,
+				buildctlBinary,
+				[]string{"debug", "workers"}...,
+			)
+			cmd.Env = append(os.Environ(), []string{"BUILDKIT_HOST=" + addr}...)
+			stdoutStderr, err := cmd.CombinedOutput()
+			if err != nil {
+				log.Warn().Err(err).Msgf("buildkit workers failed: %s", stdoutStderr)
 				continue
 			}
-			if _, err := grpc.Dial(
-				addr,
-				grpc.WithTransportCredentials(insecure.NewCredentials()),
-			); err != nil {
-				continue
-			}
+
 			log.Info().Msgf("%s is available", addr)
+
 			return nil
 		}
 	}
