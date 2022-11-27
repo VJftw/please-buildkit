@@ -127,6 +127,7 @@ set -Eeuo pipefail
     # aliases
     aliases += [repository]
     aliases_flags=[f"--aliases={a}" for a in aliases]
+    aliases_flags_cmd=" ".join(aliases_flags)
 
     sh_cmd(
         name = tag(name, "replace"),
@@ -135,7 +136,7 @@ set -Eeuo pipefail
         cmd = f"""
 set -Eeuo pipefail
 "$(out_exe {please_buildkit_tool})" replace \\\\
-    {aliases_flags} \\\\
+    {aliases_flags_cmd} \\\\
     --fqn_tags_path="$(out_location {fqn_tags_rule})" \\\\
     --file_path="\\\$1" \\\\
     \\\${{2:-}}
