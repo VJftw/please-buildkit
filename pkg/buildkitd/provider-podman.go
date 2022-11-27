@@ -3,6 +3,7 @@ package buildkitd
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -83,6 +84,24 @@ func (p *PodmanProvider) Start(ctx context.Context) (string, error) {
 	}...)
 	if err := runCmd.Run(); err != nil {
 		return "", fmt.Errorf("could not run '%s': %w", strings.Join(runCmd.Args, " "), err)
+	}
+	log.Info().Msgf("started '%s' container", p.opts.Name)
+
+	f, err := os.OpenFile("plz-out/log/please-buildkit-buildkitd.log", os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return "", fmt.Errorf("could not open log file")
+	}
+	if err := f.Truncate(0); err != nil {
+		return "", fmt.Errorf("could not truncate log file")
+	}
+	logsCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
+		"logs", "-f", p.opts.Name,
+	}...)
+	logsCmd.Stdout = f
+	logsCmd.Stderr = f
+
+	if err := logsCmd.Start(); err != nil {
+		return "", fmt.Errorf("could not run '%s': %w", strings.Join(logsCmd.Args, " "), err)
 	}
 
 	return fmt.Sprintf("tcp://%s", p.opts.Address), nil
