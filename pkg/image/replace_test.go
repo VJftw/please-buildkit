@@ -138,6 +138,13 @@ func TestReplaceImageReferences(t *testing.T) {
 			`registry.com/foo/bar:srcsha-12345`,
 			`image: "registry.com/foo/bar:srcsha-12345"`,
 		},
+		{
+			"digest, given repo",
+			"image: registry.com/foo:v0.0.0@sha256:11102cb670e913610f2e07875d28cceac87152e16daedc46a47201e537f682b4",
+			"registry.com/foo",
+			"registry.com/foo/bar:srcsha-12345",
+			"image: registry.com/foo/bar:srcsha-12345",
+		},
 	}
 
 	for _, tt := range tests {
