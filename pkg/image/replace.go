@@ -35,7 +35,7 @@ func ReplaceImageReferences(contents []byte, oldRef string, newRef string) []byt
 	if oldRepoTag.GetTag() == "" {
 		// not fq
 		oldRefOnlyRegex := regexp.QuoteMeta(oldRef)
-		oldRefRegex = regexp.MustCompile(fmt.Sprintf(`%s[^",';]+`, oldRefOnlyRegex))
+		oldRefRegex = regexp.MustCompile(fmt.Sprintf(`%s[a-z1-9:@\.\-\_]+`, oldRefOnlyRegex))
 
 		return oldRefRegex.ReplaceAll(contents, []byte(newRef))
 	}
