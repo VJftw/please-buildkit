@@ -32,14 +32,40 @@ func NewRootlessDockerProvider(o *RootlessDockerProviderOpts) *RootlessDockerPro
 }
 
 // IsSupported implements Provider.IsSupported.
-func (p *RootlessDockerProvider) IsSupported(ctx context.Context) bool {
+func (p *RootlessDockerProvider) IsSupported(ctx context.Context) error {
 	if err := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"ps",
 	}...).Run(); err != nil {
-		return false
+		return err
 	}
 
-	return true
+	securityOptionsOut, err := exec.CommandContext(ctx, p.opts.Binary, []string{
+		"info",
+		"--format", `{{ range $opt := .SecurityOptions }}{{ $opt }}{{"\n"}}{{ end }}`,
+	}...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("could not get docker security options: %w", err)
+	}
+
+	if strings.Contains(string(securityOptionsOut), "rootless") {
+		return fmt.Errorf("cannot run rootless inside rootless (we're already rootless)")
+	}
+
+	driverStatusOut, err := exec.CommandContext(ctx, p.opts.Binary, []string{
+		"info",
+		"--format", `{{ range $opt := .DriverStatus }}{{ $opt }}{{"\n"}}{{ end }}`,
+	}...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("could not get docker driver status: %w", err)
+	}
+
+	if !strings.Contains(string(driverStatusOut), "userxattr true") {
+		// I think this is the case. Experiencing this when running Docker in a
+		// container on Fedora CoreOS and mounting /var/lib/docker/docker.sock.
+		return fmt.Errorf("userxattr=true must be supported by the docker driver")
+	}
+
+	return nil
 }
 
 // Start implements Provider.Start.

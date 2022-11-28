@@ -73,7 +73,6 @@ workers as errors. Logs from this command are written to 'plz-out/log/'.
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not open log file")
 			}
-			defer f.Close()
 			if err := f.Truncate(0); err != nil {
 				log.Fatal().Err(err).Msg("could not truncate log file")
 			}
@@ -85,6 +84,7 @@ workers as errors. Logs from this command are written to 'plz-out/log/'.
 			log.Logger = zerolog.New(multi).With().Timestamp().Logger()
 
 			chainProvider := buildkitd.NewChainProvider(
+				&buildkitd.ChainProviderOpts{},
 				buildkitd.NewPodmanProvider(&buildkitd.PodmanProviderOpts{
 					Binary:  cCtx.String("podman_binary"),
 					Name:    cCtx.String("podman_name"),

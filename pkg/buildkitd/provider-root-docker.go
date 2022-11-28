@@ -32,13 +32,23 @@ func NewRootDockerProvider(o *RootDockerProviderOpts) *RootDockerProvider {
 }
 
 // IsSupported implements Provider.IsSupported.
-func (p *RootDockerProvider) IsSupported(ctx context.Context) bool {
-	if err := exec.CommandContext(ctx, p.opts.Binary, []string{
+func (p *RootDockerProvider) IsSupported(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"ps",
-	}...).Run(); err != nil {
-		return false
+	}...)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("could not get user home dir: %w", err)
 	}
-	return true
+	cmd.Env = append(
+		cmd.Env,
+		fmt.Sprintf("PATH=%s/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", homeDir),
+	)
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Start implements Provider.Start.

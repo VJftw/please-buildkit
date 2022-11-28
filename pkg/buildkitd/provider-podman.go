@@ -32,14 +32,14 @@ func NewPodmanProvider(o *PodmanProviderOpts) *PodmanProvider {
 }
 
 // IsSupported implements Provider.IsSupported.
-func (p *PodmanProvider) IsSupported(ctx context.Context) bool {
+func (p *PodmanProvider) IsSupported(ctx context.Context) error {
 	if err := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"ps",
 	}...).Run(); err != nil {
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }
 
 // Start implements Provider.Start.

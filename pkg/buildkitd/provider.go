@@ -14,7 +14,7 @@ import (
 type Provider interface {
 	// IsSupported returns whether or not the implementation is supported on
 	// this host.
-	IsSupported(ctx context.Context) bool
+	IsSupported(ctx context.Context) error
 	// Start starts the `buildkitd` daemon using the implementation and returns
 	// the buildkitd address to use as `BUILDKIT_HOST`. This should wait for the
 	// daemon to be ready.
