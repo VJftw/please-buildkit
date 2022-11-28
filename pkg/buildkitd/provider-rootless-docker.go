@@ -44,7 +44,7 @@ func (p *RootlessDockerProvider) IsSupported(ctx context.Context) error {
 		"--format", `{{ range $opt := .SecurityOptions }}{{ $opt }}{{"\n"}}{{ end }}`,
 	}...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("could not get docker security options: %w", err)
+		return fmt.Errorf("could not get docker security options: %w\n%s", err, securityOptionsOut)
 	}
 
 	if strings.Contains(string(securityOptionsOut), "rootless") {
@@ -56,7 +56,7 @@ func (p *RootlessDockerProvider) IsSupported(ctx context.Context) error {
 		"--format", `{{ range $opt := .DriverStatus }}{{ $opt }}{{"\n"}}{{ end }}`,
 	}...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("could not get docker driver status: %w", err)
+		return fmt.Errorf("could not get docker driver status: %w\n%s", err, driverStatusOut)
 	}
 
 	if !strings.Contains(string(driverStatusOut), "userxattr true") {

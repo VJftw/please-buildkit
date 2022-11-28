@@ -105,8 +105,8 @@ workers as errors. Logs from this command are written to 'plz-out/log/'.
 				}),
 			)
 
-			if !chainProvider.IsSupported(cCtx.Context) {
-				return fmt.Errorf("no supported buildkitd providers")
+			if err := chainProvider.IsSupported(cCtx.Context); err != nil {
+				return fmt.Errorf("no supported buildkitd providers: %w", err)
 			}
 
 			buildkitdAddr, err := chainProvider.Start(cCtx.Context)

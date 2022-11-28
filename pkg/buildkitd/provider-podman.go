@@ -52,7 +52,7 @@ func (p *PodmanProvider) Start(ctx context.Context) (string, error) {
 	}...)
 	out, err := existsCmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("could not run '%s': %w", strings.Join(existsCmd.Args, " "), err)
+		return "", fmt.Errorf("could not run '%s': %w\n%s", strings.Join(existsCmd.Args, " "), err, out)
 	}
 
 	if strings.Contains(string(out), p.opts.Name) {

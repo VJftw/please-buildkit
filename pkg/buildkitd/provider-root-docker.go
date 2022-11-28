@@ -44,8 +44,10 @@ func (p *RootDockerProvider) IsSupported(ctx context.Context) error {
 		cmd.Env,
 		fmt.Sprintf("PATH=%s/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", homeDir),
 	)
-	if err := cmd.Run(); err != nil {
-		return err
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("could not run '%s': %w\n%s", strings.Join(cmd.Args, " "), err, out)
 	}
 
 	return nil
