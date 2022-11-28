@@ -36,14 +36,15 @@ func (p *RootDockerProvider) IsSupported(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"ps",
 	}...)
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("could not get user home dir: %w", err)
+		log.Info().Err(err).Msg("could not get user home dir, not appending to path")
+		cmd.Env = append(
+			os.Environ(),
+			fmt.Sprintf("PATH=%s/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", homeDir),
+		)
 	}
-	cmd.Env = append(
-		os.Environ(),
-		fmt.Sprintf("PATH=%s/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", homeDir),
-	)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
