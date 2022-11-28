@@ -41,7 +41,7 @@ func (p *RootDockerProvider) IsSupported(ctx context.Context) error {
 		return fmt.Errorf("could not get user home dir: %w", err)
 	}
 	cmd.Env = append(
-		cmd.Env,
+		os.Environ(),
 		fmt.Sprintf("PATH=%s/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", homeDir),
 	)
 
