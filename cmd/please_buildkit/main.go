@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -34,7 +33,7 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:    "log_format",
-				Value:   "auto",
+				Value:   "console",
 				EnvVars: []string{"LOG_FORMAT"},
 			},
 		},
@@ -51,17 +50,11 @@ func main() {
 			zerolog.SetGlobalLevel(level)
 			log.Logger = log.Level(level)
 
-			if isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()) {
-				log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-			}
-
 			switch v := cCtx.String("log_format"); {
 			case v == "json":
 				log.Logger = log.Output(os.Stderr)
 			case v == "console":
 				log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-			case v == "auto":
-				return nil
 			default:
 				return fmt.Errorf("invalid format: %s", v)
 			}

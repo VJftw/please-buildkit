@@ -13,7 +13,6 @@ go_binary(
         "//internal/cmd",
         "//pkg/buildkitd",
         "//pkg/image",
-        "//third_party/go/github.com/mattn/go-isatty",
         "//third_party/go/github.com/rs/zerolog",
         "//third_party/go/github.com/urfave/cli/v2",
     ],
