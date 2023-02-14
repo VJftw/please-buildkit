@@ -17,6 +17,7 @@ go_binary(
         "//third_party/go/github.com/rs/zerolog",
         "//third_party/go/github.com/urfave/cli/v2",
     ],
+    static = True,
 )
 
 subinclude("//build/defs:buildkit")
