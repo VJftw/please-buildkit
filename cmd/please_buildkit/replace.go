@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/VJftw/please-buildkit/pkg/image"
@@ -61,8 +62,15 @@ During replacement, this command prioritises tags in the following order:
 				return fmt.Errorf("could not read '%s': %w", cCtx.String("fqn_tags_path"), err)
 			}
 
-			for _, alias := range cCtx.StringSlice("aliases") {
-				contents = image.ReplaceImageReferences(contents, alias, granularestRepoTagToReplace)
+			aliases := cCtx.StringSlice("aliases")
+			contents, err = image.ReplaceImageReferencesForAliases(
+				contents,
+				granularestRepoTagToReplace,
+				aliases...,
+			)
+			if err != nil {
+				log.Printf("please ensure that '%s' contains any of: %v", targetPath, aliases)
+				return fmt.Errorf("could not replace image references: %w", err)
 			}
 
 			stat, err := os.Stat(targetPath)
