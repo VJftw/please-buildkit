@@ -109,53 +109,84 @@ func TestReplaceImageReferences(t *testing.T) {
 		inOldRef    string
 		inNewRef    string
 		outContents string
+		outErr      error
 	}{
 		{
-			"given repo tag, no quotes in contents",
+			"replace given repo+tag with fqn no quotes in contents",
 			`image: registry.com/foo/bar:latest`,
 			`registry.com/foo/bar:latest`,
 			`registry.com/foo/bar:srcsha-12345`,
 			`image: registry.com/foo/bar:srcsha-12345`,
+			nil,
 		},
 		{
-			"given repo tag, quotes in contents",
+			"replace given repo tag, quotes in contents",
 			`image: "registry.com/foo/bar:latest"`,
 			`registry.com/foo/bar:latest`,
 			`registry.com/foo/bar:srcsha-12345`,
 			`image: "registry.com/foo/bar:srcsha-12345"`,
+			nil,
 		},
 		{
-			"given repo, no quotes in contents",
+			"replace given repo with fqn no quotes in contents",
 			`image: registry.com/foo/bar:latest`,
 			`registry.com/foo/bar`,
 			`registry.com/foo/bar:srcsha-12345`,
 			`image: registry.com/foo/bar:srcsha-12345`,
+			nil,
 		},
 		{
-			"given repo, quotes in contents",
+			"replace given repo with fqn, quotes in contents",
 			`image: "registry.com/foo/bar:latest"`,
 			`registry.com/foo/bar`,
 			`registry.com/foo/bar:srcsha-12345`,
 			`image: "registry.com/foo/bar:srcsha-12345"`,
+			nil,
 		},
 		{
-			"digest, given repo",
+			"replace digest with fqn by given repo",
 			"image: registry.com/foo:v0.0.0@sha256:11102cb670e913610f2e07875d28cceac87152e16daedc46a47201e537f682b4",
 			"registry.com/foo",
 			"registry.com/foo/bar:srcsha-12345",
 			"image: registry.com/foo/bar:srcsha-12345",
+			nil,
+		},
+		{
+			"replace repo only with fqn",
+			"image: registry.com/foo",
+			"registry.com/foo",
+			"registry.com/foo/bar:srcsha-12345",
+			"image: registry.com/foo/bar:srcsha-12345",
+			nil,
+		},
+		{
+			"replace repo only with fqn - quotes",
+			"image: \"registry.com/foo\"",
+			"registry.com/foo",
+			"registry.com/foo/bar:srcsha-12345",
+			"image: \"registry.com/foo/bar:srcsha-12345\"",
+			nil,
+		},
+		{
+			"error when no replacements made",
+			"image: example.com/foo:v1",
+			"registry.com/foo",
+			"registry.com/foo/bar:srcsha-12345",
+			"image: example.com/foo:v1",
+			image.ErrNoReplacementsMade,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			outContents := image.ReplaceImageReferences(
+			outContents, err := image.ReplaceImageReferences(
 				[]byte(tt.inContents),
 				tt.inOldRef,
 				tt.inNewRef,
 			)
 
 			assert.Equal(t, tt.outContents, string(outContents))
+			assert.ErrorIs(t, err, tt.outErr)
 		})
 	}
 
