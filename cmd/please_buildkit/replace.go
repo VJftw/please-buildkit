@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/VJftw/please-buildkit/pkg/image"
+	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 )
 
@@ -69,7 +69,7 @@ During replacement, this command prioritises tags in the following order:
 				aliases...,
 			)
 			if err != nil {
-				log.Printf("please ensure that '%s' contains any of: %v", targetPath, aliases)
+				log.Error().Msgf("please ensure that '%s' contains any of: %v", targetPath, aliases)
 				return fmt.Errorf("could not replace image references: %w", err)
 			}
 
