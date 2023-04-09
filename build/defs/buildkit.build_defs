@@ -108,12 +108,16 @@ $TOOL docker-archive:$SRCS -o json --file $OUTS
     )
 
     crane_tool = CONFIG.BUILDKIT.CRANE_TOOL
+    targets_to_source = CONFIG.BUILDKIT.PUSH_SOURCE_TARGET
+    targets_to_source_cmds = [ f"source $(out_location {t})" for t in targets_to_source ]
+    targets_to_source_cmd = "\n".join(targets_to_source_cmds)
     sh_cmd(
         name = f"{name}_push",
-        data = [img, please_buildkit_tool, fqn_tags_rule, crane_tool],
+        data = [img, please_buildkit_tool, fqn_tags_rule, crane_tool] + targets_to_source,
         shell = "/usr/bin/env bash",
         cmd = f"""
 set -Eeuo pipefail
+{targets_to_source_cmd}
 "$(out_exe {please_buildkit_tool})" push \\\\
     --crane_tool="$(out_exe {crane_tool})" \\\\
     --img_tar_path="$(out_location {img})" \\\\

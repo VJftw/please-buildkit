@@ -69,6 +69,11 @@ Help = "A docker image to use as the default base for all distroless images. See
 Optional = true
 Inherit = true
 
+[PluginConfig "push_source_target"]
+Repeatable = true
+Optional = true
+Help = "A list of targets to `source` into the shell before pushing images. This can be used to add credential helpers to the $PATH."
+
 ; Use the plugin in this repository for tests.
 [Plugin "buildkit"]
 ImageRepositoryPrefix = "ghcr.io/vjftw/please-buildkit"

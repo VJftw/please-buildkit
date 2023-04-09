@@ -52,7 +52,6 @@ func ReplaceImageReferences(contents []byte, oldRef string, newRef string) ([]by
 
 	if !bytes.Contains(contents, []byte(oldRef)) {
 		return contents, fmt.Errorf("could not replace fully-qualified image '%s': %w", oldRef, ErrNoReplacementsMade)
-
 	}
 
 	return bytes.ReplaceAll(contents, []byte(oldRef), []byte(newRef)), nil
