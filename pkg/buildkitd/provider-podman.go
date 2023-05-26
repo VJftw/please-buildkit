@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -12,16 +13,16 @@ import (
 
 // PodmanProviderOpts represents the options for the buildkitd podman provider.
 type PodmanProviderOpts struct {
-	Binary  string
-	Name    string
-	Image   string
-	Address string
+	Binary string
+	Image  string
 }
 
 // PodmanProvider implements the buildkit provider via Podman.
 type PodmanProvider struct {
 	Provider
 	opts *PodmanProviderOpts
+
+	Name string
 }
 
 // NewPodmanProvider returns a new buildkit provider implemented via Podman.
@@ -43,22 +44,10 @@ func (p *PodmanProvider) IsSupported(ctx context.Context) error {
 }
 
 // Start implements Provider.Start.
-func (p *PodmanProvider) Start(ctx context.Context) (string, error) {
-	existsCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
-		"ps",
-		"--filter", fmt.Sprintf("name=%s", p.opts.Name),
-		"-a",
-		"--format", "\"{{.Names}}\"",
-	}...)
-	out, err := existsCmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("could not run '%s': %w\n%s", strings.Join(existsCmd.Args, " "), err, out)
-	}
+func (p *PodmanProvider) Start(ctx context.Context, address string) error {
 
-	if strings.Contains(string(out), p.opts.Name) {
-		log.Info().Msgf("using existing '%s' container", p.opts.Name)
-		return fmt.Sprintf("tcp://%s", p.opts.Address), nil
-	}
+	portNumber := strings.Split(address, ":")[2]
+	p.Name = fmt.Sprintf("please-buildkit-%s", portNumber)
 
 	log.Info().Msgf("pulling image '%s'", p.opts.Image)
 	pullCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
@@ -66,55 +55,52 @@ func (p *PodmanProvider) Start(ctx context.Context) (string, error) {
 		p.opts.Image,
 	}...)
 	if err := pullCmd.Run(); err != nil {
-		return "", fmt.Errorf("could not run '%s': %w", strings.Join(pullCmd.Args, " "), err)
+		return fmt.Errorf("could not run '%s': %w", strings.Join(pullCmd.Args, " "), err)
 	}
 
-	log.Info().Msgf("starting '%s' container", p.opts.Name)
-	portNumber := strings.Split(p.opts.Address, ":")[1]
+	log.Info().Msgf("starting '%s' container", p.Name)
+	// TODO: attempt to set XDG_RUNTIME_DIR, $TMPDIR, $HOME to be much shorter
 	runCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"run",
 		"-d",
 		"--rm",
-		"--name", p.opts.Name,
+		"--name", p.Name,
 		"--privileged",
 		"--publish", fmt.Sprintf("%s:%s", portNumber, portNumber),
 		p.opts.Image,
 		"--addr",
-		fmt.Sprintf("tcp://%s", p.opts.Address),
+		address,
 	}...)
-	if err := runCmd.Run(); err != nil {
-		return "", fmt.Errorf("could not run '%s': %w", strings.Join(runCmd.Args, " "), err)
-	}
-	log.Info().Msgf("started '%s' container", p.opts.Name)
-
-	f, err := os.OpenFile("plz-out/log/please-buildkit-buildkitd.log", os.O_WRONLY|os.O_CREATE, 0600)
+	runOut, err := runCmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("could not open log file")
+		log.Error().Err(err).Strs("cmd", runCmd.Args).Msgf("%s", runOut)
+		return err
 	}
-	if err := f.Truncate(0); err != nil {
-		return "", fmt.Errorf("could not truncate log file")
-	}
-	logsCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
-		"logs", "-f", p.opts.Name,
-	}...)
-	logsCmd.Stdout = f
-	logsCmd.Stderr = f
+	log.Info().Msgf("started '%s' container", p.Name)
 
-	if err := logsCmd.Start(); err != nil {
-		return "", fmt.Errorf("could not run '%s': %w", strings.Join(logsCmd.Args, " "), err)
-	}
-
-	return fmt.Sprintf("tcp://%s", p.opts.Address), nil
+	return nil
 }
 
 // Stop implements Provider.Stop.
 func (p *PodmanProvider) Stop(ctx context.Context) error {
+	log.Info().Msgf("stopping '%s' container", p.Name)
 	stopCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"stop",
-		p.opts.Name,
+		p.Name,
 	}...)
-	if err := stopCmd.Run(); err != nil {
-		return fmt.Errorf("could not run '%s': %w", strings.Join(stopCmd.Args, " "), err)
+	stopOut, err := stopCmd.CombinedOutput()
+	if err != nil {
+		log.Error().Err(err).Strs("cmd", stopCmd.Args).Msgf("%s", stopOut)
+		return err
+	}
+
+	cleanupCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
+		"unshare",
+		"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".local/share/containers/storage"),
+	}...)
+	cleanupOut, err := cleanupCmd.CombinedOutput()
+	if err != nil {
+		log.Warn().Err(err).Strs("cmd", cleanupCmd.Args).Msgf("%s", cleanupOut)
 	}
 
 	return nil

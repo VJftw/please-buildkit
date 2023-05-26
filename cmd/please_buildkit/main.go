@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -19,8 +20,8 @@ func main() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-		<-c
-		log.Info().Msg("stopping")
+		sig := <-c
+		log.Info().Str("signal", sig.String()).Msg("received a stop signal, stopping...")
 		cancel()
 	}()
 
@@ -38,7 +39,7 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			WorkerCommand(),
+			BuildCommand(),
 			PushCommand(),
 			ReplaceCommand(),
 		},
@@ -54,7 +55,7 @@ func main() {
 			case v == "json":
 				log.Logger = log.Output(os.Stderr)
 			case v == "console":
-				log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+				log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.StampNano})
 			default:
 				return fmt.Errorf("invalid format: %s", v)
 			}
@@ -64,6 +65,6 @@ func main() {
 	}
 
 	if err := app.RunContext(ctx, os.Args); err != nil {
-		log.Fatal().Err(err).Msg("error")
+		log.Fatal().Msgf("%s", err)
 	}
 }

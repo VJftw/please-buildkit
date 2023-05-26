@@ -12,13 +12,6 @@ jobs:
       run: |-
         ./pleasew build -p -v=2 //...
 
-    - name: Print please-buildkit logs
-      if: always()
-      run: |-
-        set -x
-        cat plz-out/log/please-buildkit-buildkitd.log
-        cat plz-out/log/please-buildkit-worker.log
-
   test:
     runs-on: ubuntu-latest
     steps:

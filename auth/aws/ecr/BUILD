@@ -1,3 +1,5 @@
+subinclude("///shell//build_defs:shell")
+
 genrule(
     name = "env",
     data = [

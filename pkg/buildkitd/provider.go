@@ -18,7 +18,7 @@ type Provider interface {
 	// Start starts the `buildkitd` daemon using the implementation and returns
 	// the buildkitd address to use as `BUILDKIT_HOST`. This should wait for the
 	// daemon to be ready.
-	Start(ctx context.Context) (string, error)
+	Start(ctx context.Context, address string) error
 	// Stop stops the `buildkitd` daemon using the implementation.
 	Stop(ctx context.Context) error
 }

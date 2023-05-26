@@ -9,7 +9,8 @@ go_library(
     ],
     visibility = ["//cmd/..."],
     deps = [
-        "//third_party/go/github.com/rs/zerolog",
+        "///third_party/go/github.com_rs_zerolog//:zerolog",
+        "///third_party/go/github.com_rs_zerolog//log",
     ],
 )
 
@@ -23,6 +24,6 @@ go_test(
     external = True,
     deps = [
         ":image",
-        "//third_party/go/github.com/stretchr/testify",
+        "///third_party/go/github.com_stretchr_testify//assert",
     ],
 )
