@@ -1,6 +1,7 @@
 """ Rules to build Docker images via `buildkit`.
 
 """
+subinclude("///shell//build_defs:shell")
 
 def buildkit_image(
     name: str,
@@ -65,7 +66,7 @@ sed "s#^#$repo:#" $SRCS_TAGS > $OUTS
     package_name=package_name().replace("/", "_")
 
     please_buildkit_tool = CONFIG.BUILDKIT.TOOL
-    please_buildkit_worker = CONFIG.BUILDKIT.WORKER_TOOL
+    buildctl_tool=CONFIG.BUILDKIT.BUILDCTL_TOOL
     image_build_rule=genrule(
         name = f"_{name}#build",
         srcs = {
@@ -77,13 +78,18 @@ sed "s#^#$repo:#" $SRCS_TAGS > $OUTS
             "image": [f"{package_name}_{name}.tar"],
         },
         sandbox = False,
-        tools = [please_buildkit_worker],
-        cmd = f"""$(worker {please_buildkit_worker}) \\
-            --image_out="{package_name}_{name}.tar" \\
+        tools = [please_buildkit_tool, buildctl_tool],
+        cmd = f"""
+        $(exe {please_buildkit_tool}) build \\
+            --buildctl_binary=$(exe {buildctl_tool}) \\
+            --image_out="$OUT" \\
             --fqn_tags_file="$(location {fqn_tags_rule})" \\
             --dockerfile="$(location {dockerfile})"
         """,
         visibility = visibility,
+        exit_on_error = True,
+        timeout = int(CONFIG.BUILDKIT.BUILD_TIMEOUT_SECONDS),
+        pass_env = ["XDG_RUNTIME_DIR"],
     )
 
     img = filegroup(
@@ -91,20 +97,6 @@ sed "s#^#$repo:#" $SRCS_TAGS > $OUTS
         srcs = [f"{image_build_rule}|image"],
         visibility = visibility,
         labels = ["buildkit-image", "image"],
-    )
-
-    # Support SBOMs
-    sbom_tool = CONFIG.BUILDKIT.SBOM_TOOL
-    sbom=genrule(
-        name = f"{name}_sbom",
-        srcs = [img],
-        tools = [sbom_tool],
-        outs = [f"{name}_sbom.json"],
-        cmd = f"""
-set -Eeuo pipefail
-$TOOL docker-archive:$SRCS -o json --file $OUTS
-        """,
-        visibility = visibility,
     )
 
     crane_tool = CONFIG.BUILDKIT.CRANE_TOOL
@@ -268,25 +260,4 @@ def _buildkit_tool():
             url = f"https://github.com/VJftw/please-buildkit/releases/download/{CONFIG.BUILDKIT.TOOL_VERSION}/please_buildkit",
             visibility = ["PUBLIC"],
             binary = True,
-        )
-
-    if CONFIG.BUILDKIT.TOOL:
-        buildkit_tool_rule=CONFIG.BUILDKIT.TOOL
-
-    buildctl_tool=CONFIG.BUILDKIT.BUILDCTL_TOOL
-    sh_cmd(
-        name = "please_buildkit_worker",
-        data = [
-            buildkit_tool_rule,
-            buildctl_tool,
-        ],
-        shell = "/usr/bin/env bash",
-        cmd = f"""
-reporoot="\\\\$(pwd | sed 's#/plz-out/.*##g')"
-"\\\\$reporoot/$(out_exe {buildkit_tool_rule})" \\
-    worker \\
-    --buildctl_binary="\\\\$reporoot/$(out_exe {buildctl_tool})" \\
-    "\\\\$@"
-        """,
-        visibility = ["PUBLIC"],
         )

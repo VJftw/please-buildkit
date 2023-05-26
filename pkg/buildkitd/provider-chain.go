@@ -28,11 +28,12 @@ func NewChainProvider(opts *ChainProviderOpts, providers ...Provider) *ChainProv
 
 // IsSupported implements Provider.IsSupported.
 func (p *ChainProvider) IsSupported(ctx context.Context) error {
-	allErrs := errors.New("")
+	allErrs := []error{}
+
 	for _, provider := range p.providers {
 		if err := provider.IsSupported(ctx); err != nil {
 			log.Warn().Err(err).Msgf("%T is unsupported", provider)
-			allErrs = fmt.Errorf("%s: %s", err.Error(), allErrs)
+			allErrs = append(allErrs, err)
 		} else {
 			p.provider = provider
 			log.Info().Str("provider", fmt.Sprintf("%T", provider)).Msg("using provider")
@@ -40,12 +41,12 @@ func (p *ChainProvider) IsSupported(ctx context.Context) error {
 		}
 	}
 
-	return allErrs
+	return errors.Join(allErrs...)
 }
 
 // Start implements Provider.Start.
-func (p *ChainProvider) Start(ctx context.Context) (string, error) {
-	return p.provider.Start(ctx)
+func (p *ChainProvider) Start(ctx context.Context, address string) error {
+	return p.provider.Start(ctx, address)
 }
 
 // Stop implements Provider.Stop.

@@ -3,7 +3,6 @@ subinclude("///go//build_defs:go")
 go_library(
     name = "buildkitd",
     srcs = [
-        "pleaseworker.go",
         "provider.go",
         "provider-chain.go",
         "provider-podman.go",
@@ -12,7 +11,8 @@ go_library(
     ],
     visibility = ["//cmd/..."],
     deps = [
-        "//third_party/go/github.com/rs/zerolog",
-        "//third_party/go/google.golang.org/grpc",
+        "///third_party/go/github.com_rs_zerolog//:zerolog",
+        "///third_party/go/github.com_rs_zerolog//log",
+        "///third_party/go/github.com_gofrs_flock//:flock",
     ],
 )

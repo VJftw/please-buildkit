@@ -12,15 +12,14 @@ import (
 
 // RootlessDockerProviderOpts represents the options for the buildkitd docker provider.
 type RootlessDockerProviderOpts struct {
-	Binary  string
-	Name    string
-	Image   string
-	Address string
+	Binary string
+	Image  string
 }
 
 // RootlessDockerProvider implements the buildkit provider via Docker.
 type RootlessDockerProvider struct {
 	Provider
+	Name string
 	opts *RootlessDockerProviderOpts
 }
 
@@ -69,33 +68,19 @@ func (p *RootlessDockerProvider) IsSupported(ctx context.Context) error {
 }
 
 // Start implements Provider.Start.
-func (p *RootlessDockerProvider) Start(ctx context.Context) (string, error) {
-	existsCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
-		"ps",
-		"--filter", fmt.Sprintf("name=%s", p.opts.Name),
-		"-a",
-		"--format", "\"{{.Names}}\"",
-	}...)
-	out, err := existsCmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("could not run '%s': %w", strings.Join(existsCmd.Args, " "), err)
-	}
+func (p *RootlessDockerProvider) Start(ctx context.Context, address string) error {
 
-	if strings.Contains(string(out), p.opts.Name) {
-		log.Info().Msgf("using existing '%s' container", p.opts.Name)
-		return fmt.Sprintf("tcp://%s", p.opts.Address), nil
-	}
-
+	portNumber := strings.Split(address, ":")[2]
+	p.Name = fmt.Sprintf("please-buildkit-%s", portNumber)
 	log.Info().Msgf("pulling image '%s'", p.opts.Image)
 	pullCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"pull",
 		p.opts.Image,
 	}...)
 	if err := pullCmd.Run(); err != nil {
-		return "", fmt.Errorf("could not run '%s': %w", strings.Join(pullCmd.Args, " "), err)
+		return fmt.Errorf("could not run '%s': %w", strings.Join(pullCmd.Args, " "), err)
 	}
 
-	portNumber := strings.Split(p.opts.Address, ":")[1]
 	runCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"run",
 		"--rm",
@@ -103,48 +88,36 @@ func (p *RootlessDockerProvider) Start(ctx context.Context) (string, error) {
 		"--security-opt", "seccomp=unconfined",
 		"--security-opt", "apparmor=unconfined",
 		"--security-opt", "systempaths=unconfined",
-		"--name", p.opts.Name,
+		"--name", p.Name,
 		"--publish", fmt.Sprintf("%s:%s", portNumber, portNumber),
 		p.opts.Image,
 		"--addr",
-		fmt.Sprintf("tcp://%s", p.opts.Address),
+		address,
 		"--oci-worker-no-process-sandbox",
 	}...)
-	log.Info().Str("cmd", strings.Join(runCmd.Args, " ")).Msgf("starting '%s' container", p.opts.Name)
+	runCmd.Stdout = os.Stdout
+	runCmd.Stderr = os.Stderr
+
+	log.Info().Str("cmd", strings.Join(runCmd.Args, " ")).Msgf("starting '%s' container", p.Name)
 	if err := runCmd.Run(); err != nil {
-		return "", fmt.Errorf("could not run '%s': %w", strings.Join(runCmd.Args, " "), err)
+		return fmt.Errorf("could not run '%s': %w", strings.Join(runCmd.Args, " "), err)
 	}
-	log.Info().Msgf("started '%s' container", p.opts.Name)
+	log.Info().Msgf("started '%s' container", p.Name)
 
-	f, err := os.OpenFile("plz-out/log/please-buildkit-buildkitd.log", os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		return "", fmt.Errorf("could not open log file")
-	}
-	if err := f.Truncate(0); err != nil {
-		return "", fmt.Errorf("could not truncate log file")
-	}
-	logsCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
-		"logs", "-f", p.opts.Name,
-	}...)
-	logsCmd.Stdout = f
-	logsCmd.Stderr = f
-
-	if err := logsCmd.Start(); err != nil {
-		return "", fmt.Errorf("could not run '%s': %w", strings.Join(logsCmd.Args, " "), err)
-	}
-
-	return fmt.Sprintf("tcp://%s", p.opts.Address), nil
+	return nil
 }
 
 // Stop implements Provider.Stop.
 func (p *RootlessDockerProvider) Stop(ctx context.Context) error {
-	log.Info().Msgf("stopping '%s' container", p.opts.Name)
+	log.Info().Msgf("stopping '%s' container", p.Name)
 	stopCmd := exec.CommandContext(ctx, p.opts.Binary, []string{
 		"stop",
-		p.opts.Name,
+		p.Name,
 	}...)
-	if err := stopCmd.Run(); err != nil {
-		return fmt.Errorf("could not run '%s': %w", strings.Join(stopCmd.Args, " "), err)
+	stopOut, err := stopCmd.CombinedOutput()
+	if err != nil {
+		log.Error().Err(err).Strs("cmd", stopCmd.Args).Msgf("%s", stopOut)
+		return err
 	}
 
 	return nil

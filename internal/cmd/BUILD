@@ -7,7 +7,7 @@ go_library(
     ],
     visibility = ["PUBLIC"],
     deps = [
-        "//third_party/go/github.com/mattn/go-isatty",
-        "//third_party/go/github.com/rs/zerolog",
+        "///third_party/go/github.com_rs_zerolog//:zerolog",
+        "///third_party/go/github.com_rs_zerolog//log",
     ],
 )

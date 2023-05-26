@@ -6,12 +6,9 @@
 ; Or you can uncomment the following to pin everyone to a particular version;
 ; when you change it all users will automatically get updated.
 [please]
-version = 16.27.2
+version = 17.0.0
 ; Support the non *-rules repo name format of Please plugins.
 PluginRepo = "https://github.com/{owner}/{plugin}/archive/{revision}.zip"
-
-[featureflags]
-ExcludeGoRules = true
 
 ; Define the Plugin configuration options.
 [PluginDefinition]
@@ -30,16 +27,15 @@ Optional = true
 Inherit = true
 Help = "In conjunction with the default value for Tool, this sets the version of the Tool which should be downloaded from GitHub Releases."
 
-[PluginConfig "worker_tool"]
-ConfigKey = WorkerTool
-DefaultValue = "//third_party/binary:please_buildkit_worker"
-Inherit = true
-Help = "Sets the given Please target as the Please Worker Tool."
-
 [PluginConfig "buildctl_tool"]
-DefaultValue = "//third_party/binary/moby/buildkit:buildkit|buildctl"
+DefaultValue = "//third_party/binary/moby/buildkit:buildctl"
 Inherit = true
 Help = "Sets the given Please target as the 'buildctl' binary."
+
+[PluginConfig "build_timeout_seconds"]
+DefaultValue = 600
+Inherit = true
+Help = "Sets a timeout for building images."
 
 [PluginConfig "image_repository_prefix"]
 DefaultValue = ""
@@ -50,12 +46,6 @@ Help = "Sets the image repository prefix for the generated repository when taggi
 DefaultValue = 0
 Optional = true
 Inherit = true
-
-[PluginConfig "sbom_tool"]
-DefaultValue = "//third_party/binary/anchore/syft"
-Optional = true
-Inherit = true
-Help = "Sets the given Please target to use for generating SBOMs of built images."
 
 [PluginConfig "crane_tool"]
 DefaultValue = "//third_party/binary/go-containerregistry/crane"
@@ -78,10 +68,14 @@ Help = "A list of targets to `source` into the shell before pushing images. This
 [Plugin "buildkit"]
 ImageRepositoryPrefix = "ghcr.io/vjftw/please-buildkit"
 Tool = "//cmd/please_buildkit"
-WorkerTool = "//cmd/please_buildkit:please_buildkit_worker"
+BuildTimeoutSeconds = 60
 
 ; Go Plugin is used to build helpers.
 [Plugin "go"]
 Target = //third_party/plugins:go
 ImportPath = github.com/VJftw/please-buildkit
 gotool = //third_party/go:toolchain|go
+
+; Shell Plugin is used for scripts.
+[Plugin "shell"]
+Target = //third_party/plugins:shell
